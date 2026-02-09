@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PlanActive {
+  free
+  pro
+}
+
+enum BillingStatus {
+  active
+  past_due
+  canceled
+  incomplete
+}
+
+enum ScheduledSlotStatus {
+  reserved
+  consumed
+  canceled
+}
+
+enum PlanOverrideType {
+  free_extension
+  pro_trial
+  extra_posts
+}
+
+model User {
+  id             String          @id @default(uuid()) @db.Uuid
+  plan_active    PlanActive      @default(free)
+  subscriptions  Subscription[]
+  scheduledSlots ScheduledSlot[]
+  planOverrides  PlanOverride[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Subscription {
+  id                    String        @id @default(uuid()) @db.Uuid
+  userId                String        @db.Uuid
+  stripeSubscriptionId  String
+  billingStatus         BillingStatus
+  currentPeriodEnd      DateTime
+  cancelAtPeriodEnd     Boolean       @default(false)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@unique([stripeSubscriptionId])
+}
+
+model ProcessedWebhookEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  stripeEventId  String   @unique
+  receivedAt     DateTime @default(now())
+}
+
+model ScheduledSlot {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String              @db.Uuid
+  yearMonth String
+  postId    String?             @db.Uuid
+  status    ScheduledSlotStatus
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, yearMonth])
+}
+
+model PlanOverride {
+  id                     String            @id @default(uuid()) @db.Uuid
+  userId                 String            @db.Uuid
+  campaignId             String?           @db.Uuid
+  overrideType           PlanOverrideType
+  maxExtraScheduledPosts Int?
+  validFrom              DateTime
+  validUntil             DateTime
+  createdAt              DateTime          @default(now())
+  createdByAdminId       String?           @db.Uuid
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
